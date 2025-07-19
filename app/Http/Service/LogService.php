@@ -2,130 +2,77 @@
 
 namespace App\Http\Service;
 
-use App\Models\Log;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class LogService
 {
     public function getWeeklyData()
     {
+        $userId = Auth::id();
         $today = CarbonImmutable::now();
-        $startOfWeek = $today->startOfWeek(CarbonImmutable::MONDAY);
-        $endOfWeek = $today->endOfWeek(CarbonImmutable::SUNDAY);
+        $startOfWeek = $today->startOfWeek(CarbonImmutable::MONDAY)->toDateTimeString();
+        $endOfWeek = $today->endOfWeek(CarbonImmutable::SUNDAY)->toDateTimeString();
 
-        $logs = Log::whereBetween('start_date', [$startOfWeek, $endOfWeek])
-            ->where('user_id', Auth::id())
-            ->get();
+        $rawResults = DB::table('logs')
+            ->selectRaw("DAYNAME(start_date) as day, SUM(TIMESTAMPDIFF(HOUR, start_date, end_date)) as total_hours")
+            ->where('user_id', $userId)
+            ->whereBetween('start_date', [$startOfWeek, $endOfWeek])
+            ->whereNotNull('start_date')
+            ->whereNotNull('end_date')
+            ->groupBy(DB::raw('DAYNAME(start_date)'))
+            ->pluck('total_hours', 'day');
 
+        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        $hoursPerDay = [];
         $weeklyHours = 0;
 
-        $hoursPerDay = [
-            'Monday' => 0,
-            'Tuesday' => 0,
-            'Wednesday' => 0,
-            'Thursday' => 0,
-            'Friday' => 0,
-            'Saturday' => 0,
-            'Sunday' => 0,
+        foreach ($days as $day) {
+            $hours = (int) ($rawResults[$day] ?? 0);
+            $hoursPerDay[] = $hours;
+            $weeklyHours += $hours;
+        }
+
+        return [
+            'weekly_day_log' => [
+                'labels' => $days,
+                'data' => $hoursPerDay,
+            ],
+            'total_week' => $weeklyHours,
         ];
-
-        if ($logs->isEmpty()) {
-            return ['weekly_day_log' => $hoursPerDay, 'total_week' => $weeklyHours];
-        }
-
-        if (!empty($logs)) {
-            foreach ($logs as $log) {
-                $startDate = CarbonImmutable::parse($log->start_date);
-                $endDate = CarbonImmutable::parse($log->end_date);
-
-                if (!empty($log->start_date) && !empty($log->end_date)) {
-                    $hoursWorked = $endDate->diffInHours($startDate);
-                    $dayOfWeek = $startDate->format('l');
-
-                    $hoursPerDay[$dayOfWeek] += $hoursWorked;
-
-                    $weeklyHours = $weeklyHours + $hoursWorked;
-                }
-            }
-
-            $weeklyData = [
-                'labels' => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-                'data' => [
-                    $hoursPerDay['Monday'],
-                    $hoursPerDay['Tuesday'],
-                    $hoursPerDay['Wednesday'],
-                    $hoursPerDay['Thursday'],
-                    $hoursPerDay['Friday'],
-                    $hoursPerDay['Saturday'],
-                    $hoursPerDay['Sunday'],
-                ],
-            ];
-        }
-
-        return ['weekly_day_log' => $weeklyData, 'total_week' => $weeklyHours];
     }
 
     public function getMonthlyData()
     {
+        $userId = Auth::id();
+        $currentYear = now()->year;
 
-        $currentYear = CarbonImmutable::now()->year;
-
-        $startOfYear = CarbonImmutable::createFromDate($currentYear, 1, 1)->startOfDay();
-        $endOfYear = CarbonImmutable::createFromDate($currentYear, 12, 31)->endOfDay();
+        $monthlyTotals = DB::table('logs')
+            ->selectRaw('MONTH(start_date) as month, SUM(TIMESTAMPDIFF(SECOND, start_date, end_date)) / 3600 as total_hours')
+            ->whereYear('start_date', $currentYear)
+            ->where('user_id', $userId)
+            ->whereNotNull('start_date')
+            ->whereNotNull('end_date')
+            ->groupBy(DB::raw('MONTH(start_date)'))
+            ->pluck('total_hours', 'month');
 
         $months = [
             'January', 'February', 'March', 'April', 'May', 'June',
             'July', 'August', 'September', 'October', 'November', 'December'
         ];
 
-        $monthlyData = array_fill_keys($months, 0);
+        $monthlyData = [];
+        foreach (range(1, 12) as $monthNumber) {
+            $monthlyData[] = round($monthlyTotals[$monthNumber] ?? 0, 2);
+        }
 
-        $logs = Log::WhereBetween('start_date', [$startOfYear, $endOfYear])
-            ->where('user_id', Auth::id())
-            ->get();
-
-        if ($logs->isEmpty()) {
-            $monthlyChartData = [
+        return [
+            'monthly_log' => [
                 'labels' => $months,
-                'data' => array_values($monthlyData),
-            ];
-            return ['monthly_log' => $monthlyChartData, 'total_month' => 0];
-        }
-
-        foreach ($logs as $log) {
-            $startDate = CarbonImmutable::parse($log->start_date);
-            $endDate = CarbonImmutable::parse($log->end_date);
-
-            if (!empty($log->start_date) && !empty($log->end_date)) {
-                if ($startDate->year < $currentYear) {
-                    $startDate = $startOfYear;
-                }
-                if ($endDate->year > $currentYear) {
-                    $endDate = $endOfYear;
-                }
-
-                $currentDate = $startDate;
-                while ($currentDate->lte($endDate)) {
-                    $monthName = $currentDate->format('F');
-
-                    if ($currentDate->isSameDay($endDate)) {
-                        $hoursWorked = $endDate->diffInHours($currentDate);
-                    } else {
-                        $hoursWorked = $currentDate->endOfDay()->diffInHours($currentDate);
-                    }
-
-                    $monthlyData[$monthName] += $hoursWorked;
-                    $currentDate = $currentDate->addDay();
-                }
-
-                $monthlyChartData = [
-                    'labels' => $months,
-                    'data' => array_values($monthlyData),
-                ];
-            }
-        }
-
-        return ['monthly_log' => $monthlyChartData];
+                'data' => $monthlyData,
+            ],
+            'total_year' => array_sum($monthlyData),
+        ];
     }
 }

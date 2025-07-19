@@ -1,10 +1,10 @@
 <x-app-layout>
 
-        <x-slot name="header">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                {{ __('Dashboard') }}
-            </h2>
-        </x-slot>
+    <x-slot name="header">
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+            {{ __('Dashboard') }}
+        </h2>
+    </x-slot>
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
@@ -36,13 +36,15 @@
 
                     <div class="grid grid-cols-2 gap-4 p-4">
                         <!-- Card 1 -->
-                        <div class="bg-white border border-gray-200 rounded-2xl shadow p-6" style="background-color: darkkhaki;">
+                        <div class="bg-white border border-gray-200 rounded-2xl shadow p-6"
+                             style="background-color: darkkhaki;">
                             <h1 class="text-lg font-bold mb-4" style="text-align: center;">Weekly Working Hours</h1>
                             <h3 class="text-lg font-bold" style="text-align: center;">{{$weeklyHours}} Hours</h3>
                         </div>
 
                         <!-- Card 2 -->
-                        <div class="bg-white border border-gray-200 rounded-2xl shadow p-6" style="background-color: darkkhaki;">
+                        <div class="bg-white border border-gray-200 rounded-2xl shadow p-6"
+                             style="background-color: darkkhaki;">
                             <h1 class="text-lg font-bold mb-4" style="text-align: center;">Monthly Working Hours</h1>
                             <h3 class="text-lg font-bold" style="text-align: center;">{{$monthlyHours}} Hours</h3>
                         </div>
@@ -57,13 +59,15 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
 
                 @if (session('success'))
-                    <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 2000)" class="p-4 mb-4 bg-green-100 text-green-800 border border-green-300 rounded-md">
+                    <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 2000)"
+                         class="p-4 mb-4 bg-green-100 text-green-800 border border-green-300 rounded-md">
                         {{ session('success') }}
                     </div>
                 @endif
 
                 @if (session('error'))
-                    <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 2000)" class="p-4 mb-4 bg-red-100 text-red-800 border border-red-300 rounded-md">
+                    <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 2000)"
+                         class="p-4 mb-4 bg-red-100 text-red-800 border border-red-300 rounded-md">
                         {{ session('error') }}
                     </div>
                 @endif
@@ -73,6 +77,19 @@
                         @csrf
 
                         @if(!empty($last_activity['check_out']))
+                            <div class="mb-4 text-gray-900">
+                                <h3 class="text-lg font-bold mb-2">Enter your log</h3>
+                            </div>
+                            <div class="mb-4">
+                                <label for="datetime" class="block text-sm font-medium text-gray-700">Select Date and
+                                    Time</label>
+                                <input type="text" id="datetime" name="checkin"
+                                       class="mt-1 block fw-medium border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                       required>
+                            </div>
+
+                            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Check In</button>
+                        @elseif(empty($last_activity['check_in']) && empty($last_activity['check_out']))
                             <div class="mb-4 text-gray-900">
                                 <h3 class="text-lg font-bold mb-2">Enter your log</h3>
                             </div>
